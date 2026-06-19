@@ -10,7 +10,7 @@ export const polar = (r, deg) => {
   return [50 + r * Math.sin(a), 50 - r * Math.cos(a)];
 };
 
-export function sectorPath(r0, r1, a0, a1) {
+function sectorPath(r0, r1, a0, a1) {
   const [x1, y1] = polar(r1, a0), [x2, y2] = polar(r1, a1);
   const [x3, y3] = polar(r0, a1), [x4, y4] = polar(r0, a0);
   const big = a1 - a0 > 180 ? 1 : 0;

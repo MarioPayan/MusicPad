@@ -4,6 +4,8 @@
 * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html, body { height:100%; margin:0; }
 body { font:16px/1.2 system-ui,sans-serif; background:var(--bg); color:var(--txt);
+       /* no long-press text/SVG selection when tapping tiles */
+       user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
        display:flex; align-items:stretch; overflow:hidden; gap:6px;
        padding:6px calc(6px + env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) calc(6px + env(safe-area-inset-left)); }
 

@@ -25,8 +25,6 @@ let mod = '—';
 let swiping = false; // true once a vertical drag on the right column is recognised
 const latched = new Map(); // sector element -> notes[] held in latch mode
 
-const midiToNotes = (m) => m.map(n => Tone.Frequency(n, 'midi').toNote());
-
 async function ensureStarted() {
   if (started) return;
   await Tone.start();
@@ -49,7 +47,7 @@ ROOTS.forEach((_, rootIdx) => {
     const press = async (e) => {
       g.releasePointerCapture?.(e.pointerId); // let the finger slide to a neighbour
       await ensureStarted();
-      const notes = midiToNotes(triadMidi(rootIdx, octave, isMinor, mod));
+      const notes = triadMidi(rootIdx, octave, isMinor, mod).map(n => Tone.Frequency(n, 'midi').toNote());
       if (latchEl.checked) {
         if (latched.has(g)) { synth.triggerRelease(latched.get(g)); latched.delete(g); g.classList.remove('on'); return; }
         synth.triggerAttack(notes); latched.set(g, notes); g.classList.add('on');
@@ -67,10 +65,10 @@ ROOTS.forEach((_, rootIdx) => {
     g.addEventListener('pointerup', release);
     g.addEventListener('pointerleave', release);
     g.addEventListener('pointercancel', release);
-    chordSectors.push(g);
+    chordSectors.push(g);          // kept for latch-clearing
+    chordWheel.appendChild(g);
   });
 });
-chordSectors.forEach(s => chordWheel.appendChild(s));
 chordWheel.appendChild(document.getElementById('chordHubGroup')); // hub on top
 
 // ============================ alteration wheel ============================
