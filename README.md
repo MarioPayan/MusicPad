@@ -17,7 +17,11 @@ Audio is a warm synth pad (no samples, no network).
     alteration with no chord held does nothing.
   - **Melody** (page 2): single notes across two octaves for melodies (outer = octave+2,
     inner = octave+1).
-- **⚙ Settings:** octave, attack, volume, latch (hold-to-sustain hands-free).
+- **⚙ Settings:** instrument preset, octave, capo/transpose, attack, brightness,
+  reverb, volume, strum, key lock (dims out-of-key chords), latch. All persisted
+  to `localStorage`. Screen stays awake while playing (Wake Lock).
+
+Installable as a **PWA** (Add to Home Screen) and works offline.
 
 ## Develop
 

@@ -1,7 +1,13 @@
 // Smoke test for the chord math (the only non-trivial logic). Run: npm test
 import assert from 'node:assert';
-import { ROOTS, triadMidi, triadLabel } from './src/chords.js';
+import { ROOTS, triadMidi, triadLabel, keyChords } from './src/chords.js';
 import { polar } from './src/tile.js';
+
+// key lock: C major → I C, ii Dm, iii Em, IV F, V G, vi Am (vii° has no tile)
+assert.deepStrictEqual(
+  [...keyChords(0, 'major')].sort(),
+  ['0:0', '2:1', '4:1', '5:0', '7:0', '9:1'].sort(),
+);
 
 // shared wheel geometry: 0° is 12 o'clock, clockwise (used by every tile)
 assert.deepStrictEqual(polar(50, 0).map(Math.round), [50, 0]);    // top

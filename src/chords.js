@@ -44,3 +44,22 @@ export function triadLabel(rootIdx, isMinor, mod) {
   const m = isMinor && !OVERRIDE.has(mod) ? 'm' : '';
   return ROOTS[rootIdx] + m + (mod === '—' ? '' : mod);
 }
+
+// --- Key lock: which maj/min wheel tiles are diatonic to a key ---
+export const SCALES = { major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10] };
+
+// Returns a Set of "<pitchClass>:<0|1>" (0=major tile, 1=minor tile) for the
+// diatonic triads of the key. Diminished degrees have no wheel tile, so skipped.
+export function keyChords(tonic, scaleName) {
+  const sc = SCALES[scaleName];
+  const set = new Set();
+  sc.forEach((s, i) => {
+    const root = (tonic + s) % 12;
+    const third = (tonic + sc[(i + 2) % 7]) % 12;
+    const fifth = (tonic + sc[(i + 4) % 7]) % 12;
+    const t3 = (third - root + 12) % 12, t5 = (fifth - root + 12) % 12;
+    if (t5 === 7 && t3 === 4) set.add(root + ':0');      // major triad
+    else if (t5 === 7 && t3 === 3) set.add(root + ':1'); // minor triad
+  });
+  return set;
+}

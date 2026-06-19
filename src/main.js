@@ -1,6 +1,6 @@
 import './style.css';
 import * as Tone from 'tone';
-import { ROOTS, MODS, triadMidi, triadLabel } from './chords.js';
+import { ROOTS, MODS, triadMidi, triadLabel, keyChords } from './chords.js';
 import { makeTile } from './tile.js';
 
 // Cut Tone's default 100ms scheduling buffer — we trigger live on touch, not on
@@ -8,33 +8,61 @@ import { makeTile } from './tile.js';
 // ponytail: 0.01s, not 0 — a hair of buffer avoids clicks/dropouts on mobile.
 Tone.getContext().lookAhead = 0.01;
 
-// Warm synth pad — fat saw through a lowpass + a touch of reverb so it sits
-// under singing without the percussive piano transient. No network needed.
-let started = false;
+// ---- audio graph: PolySynth → lowpass (brightness) → reverb → out ----
 const reverb = new Tone.Reverb({ decay: 1.6, wet: 0.18 }).toDestination();
 const filter = new Tone.Filter(2200, 'lowpass').connect(reverb);
-const synth = new Tone.PolySynth(Tone.Synth, {
-  oscillator: { type: 'fatsawtooth', count: 3, spread: 24 },
-  // attack > 0 = soft swell instead of the piano's instant hit, still snappy
-  envelope: { attack: 0.07, decay: 0.25, sustain: 0.85, release: 1.1 },
-}).connect(filter);
-synth.volume.value = -16;
+const synth = new Tone.PolySynth(Tone.Synth).connect(filter);
 
-let octave = 3;
+// instrument presets: oscillator shape + amplitude envelope per sound
+const INSTRUMENTS = {
+  pad:     { oscillator: { type: 'fatsawtooth', count: 3, spread: 24 }, envelope: { attack: 0.07, decay: 0.25, sustain: 0.85, release: 1.1 } },
+  strings: { oscillator: { type: 'fatsawtooth', count: 3, spread: 30 }, envelope: { attack: 0.35, decay: 0.3, sustain: 0.9, release: 1.6 } },
+  organ:   { oscillator: { type: 'square' },   envelope: { attack: 0.005, decay: 0.05, sustain: 1, release: 0.2 } },
+  epiano:  { oscillator: { type: 'triangle' }, envelope: { attack: 0.005, decay: 0.6, sustain: 0.25, release: 0.8 } },
+  pluck:   { oscillator: { type: 'sawtooth' }, envelope: { attack: 0.003, decay: 0.25, sustain: 0, release: 0.3 } },
+  bell:    { oscillator: { type: 'sine' },     envelope: { attack: 0.002, decay: 1.2, sustain: 0, release: 1.2 } },
+};
+
+// ---- persisted settings (localStorage) ----
+const STORE = 'musicpad';
+const cfg = Object.assign(
+  { instrument: 'pad', octave: 3, attack: 0.07, volume: -16, brightness: 2200,
+    reverb: 0.18, capo: 0, keyRoot: -1, scale: 'major', strum: false, latch: false },
+  (() => { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch { return {}; } })(),
+);
+const save = () => localStorage.setItem(STORE, JSON.stringify(cfg));
+
+function applyInstrument(name, resetAttack = true) {
+  synth.set(INSTRUMENTS[name]);
+  cfg.instrument = name;
+  if (resetAttack) cfg.attack = INSTRUMENTS[name].envelope.attack;
+}
+
 let mod = '—'; // current alteration — held momentarily on the right wheel, '—' = none
 let swiping = false; // true once a vertical drag on the right column is recognised
 
-// Unlock audio on the very first user gesture (mobile autoplay policy). Capture
-// phase → runs before any pad handler, so press() can stay synchronous. That
-// matters: an async press could fire triggerAttack AFTER its own pointerup
+// push saved settings into the audio graph
+applyInstrument(cfg.instrument, false);
+synth.set({ envelope: { attack: cfg.attack } });
+synth.volume.value = cfg.volume;
+filter.frequency.value = cfg.brightness;
+reverb.wet.value = cfg.reverb;
+
+// ---- audio unlock + screen wake lock on the first user gesture (mobile) ----
+// Capture phase → runs before any pad handler, so press() can stay synchronous.
+// That matters: an async press could fire triggerAttack AFTER its own pointerup
 // release, orphaning the first note so it sustained forever.
+let started = false, wakeLock = null;
+async function keepAwake() { try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {} }
 function unlock() {
   if (started) return;
   started = true;
   Tone.start();
+  keepAwake();
   document.removeEventListener('pointerdown', unlock, true);
 }
 document.addEventListener('pointerdown', unlock, true);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
 
 // ============================ chord wheel ============================
 const chordWheel = document.getElementById('chordWheel');
@@ -44,11 +72,19 @@ const chordSectors = [];
 const voicings = new Map(); // sounding chord tile -> { rootIdx, isMinor, notes }
 
 const chordNotes = (rootIdx, isMinor) =>
-  triadMidi(rootIdx, octave, isMinor, mod).map(n => Tone.Frequency(n, 'midi').toNote());
+  triadMidi(rootIdx, cfg.octave, isMinor, mod).map(n => Tone.Frequency(n + cfg.capo, 'midi').toNote());
+
+// strum = stagger the attacks slightly instead of hitting every note at once
+function attack(notes) {
+  if (cfg.strum && Array.isArray(notes) && notes.length > 1) {
+    const t = Tone.now();
+    notes.forEach((n, i) => synth.triggerAttack(n, t + i * 0.022));
+  } else synth.triggerAttack(notes);
+}
 
 function startChord(g, rootIdx, isMinor) {
   const notes = chordNotes(rootIdx, isMinor);
-  synth.triggerAttack(notes);
+  attack(notes);
   voicings.set(g, { rootIdx, isMinor, notes });
   g.classList.add('on');
   chordHub.textContent = triadLabel(rootIdx, isMinor, mod);
@@ -68,7 +104,7 @@ function reVoiceAll() {
     const drop = v.notes.filter(n => !next.includes(n));
     const add = next.filter(n => !v.notes.includes(n));
     if (drop.length) synth.triggerRelease(drop);
-    if (add.length) synth.triggerAttack(add);
+    if (add.length) attack(add);
     v.notes = next;
     chordHub.textContent = triadLabel(v.rootIdx, v.isMinor, mod);
   });
@@ -80,6 +116,7 @@ ROOTS.forEach((_, rootIdx) => {
     const c = rootIdx * 30;                 // chromatic, C at top, 30° per note
     const g = makeTile({ cls: 'tile' + (isMinor ? ' min' : ''), r0, r1, a0: c - 15, a1: c + 15,
                          label: triadLabel(rootIdx, isMinor, '—') });
+    g.dataset.key = rootIdx + ':' + (isMinor ? 1 : 0); // for key-lock highlighting
 
     const press = (e) => {
       g.releasePointerCapture?.(e.pointerId); // let the finger slide to a neighbour
@@ -96,6 +133,12 @@ ROOTS.forEach((_, rootIdx) => {
   });
 });
 chordWheel.appendChild(document.getElementById('chordHubGroup')); // hub on top
+
+// Key lock: dim the chords that aren't diatonic to the chosen key (visual aid only).
+function applyKeyLock() {
+  const set = cfg.keyRoot < 0 ? null : keyChords(cfg.keyRoot, cfg.scale);
+  chordSectors.forEach(s => s.classList.toggle('out', set ? !set.has(s.dataset.key) : false));
+}
 
 // ============================ alteration wheel ============================
 // Two rings like the chord wheel: outer = sevenths/extensions (added over the
@@ -143,12 +186,12 @@ function buildNoteRing(octOffset, r0, r1, inner) {
   ROOTS.forEach((name, i) => {
     const c = i * 30;
     const g = makeTile({ cls: 'tile note' + (inner ? ' inner' : ''), r0, r1, a0: c - 15, a1: c + 15, label: name });
-    const refresh = () => g.setLabel(name + (octave + octOffset)); // e.g. C5 / C4
+    const refresh = () => g.setLabel(name + (cfg.octave + octOffset)); // e.g. C5 / C4
     refresh();
     noteLabels.push(refresh);
     const press = (e) => {
       g.releasePointerCapture?.(e.pointerId); // legato: slide across notes
-      const note = Tone.Frequency(12 * (octave + octOffset + 1) + i, 'midi').toNote();
+      const note = Tone.Frequency(12 * (cfg.octave + octOffset + 1) + i + cfg.capo, 'midi').toNote();
       synth.triggerAttack(note); g.dataset.note = note; g.classList.add('on');
       notesHub.textContent = note;
     };
@@ -195,17 +238,44 @@ rcol.addEventListener('pointerup', e => {
 applyPage();
 
 // ============================ settings panel ============================
-const settingsEl = document.getElementById('settings');
-const latchEl = document.getElementById('latch');
-document.getElementById('gear').addEventListener('click', () => settingsEl.hidden = false);
-document.getElementById('close').addEventListener('click', () => settingsEl.hidden = true);
+const $ = (id) => document.getElementById(id);
+const settingsEl = $('settings');
+const latchEl = $('latch');
+const octvEl = $('octv'), atkEl = $('atk'), capovEl = $('capov');
+const capoStr = () => (cfg.capo > 0 ? '+' : '') + cfg.capo;
+$('gear').addEventListener('click', () => settingsEl.hidden = false);
+$('close').addEventListener('click', () => settingsEl.hidden = true);
 
-const octvEl = document.getElementById('octv');
-document.getElementById('oct').addEventListener('input', e => { octave = +e.target.value; octvEl.textContent = octave; noteLabels.forEach(r => r()); });
-document.getElementById('atk').addEventListener('input', e => { synth.set({ envelope: { attack: +e.target.value } }); });
-document.getElementById('vol').addEventListener('input', e => { synth.volume.value = +e.target.value; });
+// reflect saved settings into the controls
+function syncControls() {
+  $('inst').value = cfg.instrument;
+  $('oct').value = cfg.octave; octvEl.textContent = cfg.octave;
+  atkEl.value = cfg.attack;
+  $('capo').value = cfg.capo; capovEl.textContent = capoStr();
+  $('bright').value = cfg.brightness;
+  $('rev').value = cfg.reverb;
+  $('vol').value = cfg.volume;
+  $('keyRoot').value = cfg.keyRoot;
+  $('scale').value = cfg.scale;
+  $('strum').checked = cfg.strum;
+  latchEl.checked = cfg.latch;
+}
+syncControls();
+applyKeyLock();
+
+$('inst').addEventListener('change', e => { applyInstrument(e.target.value); synth.set({ envelope: { attack: cfg.attack } }); atkEl.value = cfg.attack; save(); });
+$('oct').addEventListener('input', e => { cfg.octave = +e.target.value; octvEl.textContent = cfg.octave; noteLabels.forEach(r => r()); save(); });
+$('atk').addEventListener('input', e => { cfg.attack = +e.target.value; synth.set({ envelope: { attack: cfg.attack } }); save(); });
+$('capo').addEventListener('input', e => { cfg.capo = +e.target.value; capovEl.textContent = capoStr(); save(); });
+$('bright').addEventListener('input', e => { cfg.brightness = +e.target.value; filter.frequency.value = cfg.brightness; save(); });
+$('rev').addEventListener('input', e => { cfg.reverb = +e.target.value; reverb.wet.value = cfg.reverb; save(); });
+$('vol').addEventListener('input', e => { cfg.volume = +e.target.value; synth.volume.value = cfg.volume; save(); });
+$('keyRoot').addEventListener('change', e => { cfg.keyRoot = +e.target.value; applyKeyLock(); save(); });
+$('scale').addEventListener('change', e => { cfg.scale = e.target.value; applyKeyLock(); save(); });
+$('strum').addEventListener('change', e => { cfg.strum = e.target.checked; save(); });
 
 latchEl.addEventListener('change', () => {
+  cfg.latch = latchEl.checked; save();
   if (!latchEl.checked) {
     voicings.forEach(v => synth.triggerRelease(v.notes));
     voicings.clear();
