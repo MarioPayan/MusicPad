@@ -25,11 +25,17 @@ let mod = '—';
 let swiping = false; // true once a vertical drag on the right column is recognised
 const latched = new Map(); // sector element -> notes[] held in latch mode
 
-async function ensureStarted() {
+// Unlock audio on the very first user gesture (mobile autoplay policy). Capture
+// phase → runs before any pad handler, so press() can stay synchronous. That
+// matters: an async press could fire triggerAttack AFTER its own pointerup
+// release, orphaning the first note so it sustained forever.
+function unlock() {
   if (started) return;
-  await Tone.start();
   started = true;
+  Tone.start();
+  document.removeEventListener('pointerdown', unlock, true);
 }
+document.addEventListener('pointerdown', unlock, true);
 
 // ============================ chord wheel ============================
 const chordWheel = document.getElementById('chordWheel');
@@ -44,9 +50,8 @@ ROOTS.forEach((_, rootIdx) => {
     const g = makeTile({ cls: 'tile' + (isMinor ? ' min' : ''), r0, r1, a0: c - 15, a1: c + 15,
                          label: triadLabel(rootIdx, isMinor, '—') });
 
-    const press = async (e) => {
+    const press = (e) => {
       g.releasePointerCapture?.(e.pointerId); // let the finger slide to a neighbour
-      await ensureStarted();
       const notes = triadMidi(rootIdx, octave, isMinor, mod).map(n => Tone.Frequency(n, 'midi').toNote());
       if (latchEl.checked) {
         if (latched.has(g)) { synth.triggerRelease(latched.get(g)); latched.delete(g); g.classList.remove('on'); return; }
@@ -116,9 +121,8 @@ function buildNoteRing(octOffset, r0, r1, inner) {
     const refresh = () => g.setLabel(name + (octave + octOffset)); // e.g. C5 / C4
     refresh();
     noteLabels.push(refresh);
-    const press = async (e) => {
+    const press = (e) => {
       g.releasePointerCapture?.(e.pointerId); // legato: slide across notes
-      await ensureStarted();
       const note = Tone.Frequency(12 * (octave + octOffset + 1) + i, 'midi').toNote();
       synth.triggerAttack(note); g.dataset.note = note; g.classList.add('on');
       notesHub.textContent = note;
