@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Chord Pad</title>
+<title>MusicPad</title>
 </head>
 <body>
   <div class="wheelwrap">
-    <svg id="chordWheel" viewBox="0 0 100 100" aria-label="Rueda de acordes">
+    <svg id="chordWheel" viewBox="0 0 100 100" aria-label="Chord wheel">
       <g id="chordHubGroup">
         <circle cx="50" cy="50" r="11.5" class="hub-bg"></circle>
         <text id="chordHub" x="50" y="50" dy="0.34em">♪</text>
@@ -18,7 +18,7 @@
   <div class="rcol" id="rcol">
     <div class="rtrack" id="rtrack">
       <div class="rpanel">
-        <svg id="altWheel" viewBox="0 0 100 100" aria-label="Rueda de alteraciones">
+        <svg id="altWheel" viewBox="0 0 100 100" aria-label="Alteration wheel">
           <g id="altHubGroup">
             <circle cx="50" cy="50" r="11.5" class="hub-bg"></circle>
             <text id="altHub" x="50" y="48" dy="0.34em">—</text>
@@ -27,11 +27,11 @@
         </svg>
       </div>
       <div class="rpanel">
-        <svg id="notesWheel" viewBox="0 0 100 100" aria-label="Rueda de notas">
+        <svg id="notesWheel" viewBox="0 0 100 100" aria-label="Note wheel">
           <g id="notesHubGroup">
             <circle cx="50" cy="50" r="11.5" class="hub-bg"></circle>
             <text id="notesHub" x="50" y="48" dy="0.34em">♪</text>
-            <text class="hub-cap" x="50" y="56" dy="0.34em">melodía</text>
+            <text class="hub-cap" x="50" y="56" dy="0.34em">melody</text>
           </g>
         </svg>
       </div>
@@ -39,16 +39,16 @@
     <div class="pagedots" id="pagedots"><span class="dot on"></span><span class="dot"></span></div>
   </div>
 
-  <button class="gear" id="gear" aria-label="Configuración">⚙</button>
+  <button class="gear" id="gear" aria-label="Settings">⚙</button>
 
   <div class="settings" id="settings" hidden>
     <div class="panel">
-      <div class="panel-head"><b>Configuración</b><button class="gear" id="close" aria-label="Cerrar">✕</button></div>
-      <label>Octava <input type="range" id="oct" min="1" max="5" value="3"><span id="octv">3</span></label>
-      <label>Ataque <input type="range" id="atk" min="0.005" max="0.4" step="0.005" value="0.07"></label>
-      <label>Volumen <input type="range" id="vol" min="-40" max="0" value="-16"></label>
-      <label class="latch"><input type="checkbox" id="latch"> Mantener (latch)</label>
-      <p class="hint">Rueda izquierda = alteración (centro la limpia). Rueda derecha: anillo externo mayores, interno menores. La alteración elegida se hornea en cada acorde.</p>
+      <div class="panel-head"><b>Settings</b><button class="gear" id="close" aria-label="Close">✕</button></div>
+      <label>Octave <input type="range" id="oct" min="1" max="5" value="3"><span id="octv">3</span></label>
+      <label>Attack <input type="range" id="atk" min="0.005" max="0.4" step="0.005" value="0.07"></label>
+      <label>Volume <input type="range" id="vol" min="-40" max="0" value="-16"></label>
+      <label class="latch"><input type="checkbox" id="latch"> Hold (latch)</label>
+      <p class="hint">Left wheel = chords: outer ring majors, inner ring minors. Right wheel: swipe between alterations (centre clears) and a melody page of single notes. The chosen alteration is baked into every chord.</p>
     </div>
   </div>
 

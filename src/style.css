@@ -9,6 +9,9 @@ body { font:16px/1.2 system-ui,sans-serif; background:var(--bg); color:var(--txt
        display:flex; align-items:stretch; overflow:hidden; gap:6px;
        padding:6px calc(6px + env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) calc(6px + env(safe-area-inset-left)); }
 
+/* portrait: stack the two wheels vertically instead of side by side */
+@media (orientation:portrait) { body { flex-direction:column; } }
+
 button { font:inherit; color:var(--txt); user-select:none; touch-action:none; }
 
 /* two wheels, side by side, each kept square and centred in its half */
