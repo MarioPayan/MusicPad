@@ -12,8 +12,9 @@ Audio is a warm synth pad (no samples, no network).
 - **Left — chords.** Outer ring = the 12 major chords, inner ring = the 12 minors,
   chromatic with C at top. One tap = one finished chord. Centre shows what's playing.
 - **Right — two pages, swipe up/down:**
-  - **Alterations** (page 1): sticky modifier baked into every chord — 7, maj7, 9,
-    sus4, dim, m7b5, 7#9… Centre clears to a plain triad.
+  - **Alterations** (page 1): hold one to colour the chord you're already holding —
+    7, maj7, 9, sus4, dim, m7b5, 7#9… Release reverts to the plain triad; an
+    alteration with no chord held does nothing.
   - **Melody** (page 2): single notes across two octaves for melodies (outer = octave+2,
     inner = octave+1).
 - **⚙ Settings:** octave, attack, volume, latch (hold-to-sustain hands-free).

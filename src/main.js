@@ -21,9 +21,8 @@ const synth = new Tone.PolySynth(Tone.Synth, {
 synth.volume.value = -16;
 
 let octave = 3;
-let mod = '—';
+let mod = '—'; // current alteration — held momentarily on the right wheel, '—' = none
 let swiping = false; // true once a vertical drag on the right column is recognised
-const latched = new Map(); // sector element -> notes[] held in latch mode
 
 // Unlock audio on the very first user gesture (mobile autoplay policy). Capture
 // phase → runs before any pad handler, so press() can stay synchronous. That
@@ -42,6 +41,38 @@ const chordWheel = document.getElementById('chordWheel');
 const chordHub = document.getElementById('chordHub');
 const RING = { maj: [35, 50], min: [13, 34] }; // inner ring reaches closer to the small hub
 const chordSectors = [];
+const voicings = new Map(); // sounding chord tile -> { rootIdx, isMinor, notes }
+
+const chordNotes = (rootIdx, isMinor) =>
+  triadMidi(rootIdx, octave, isMinor, mod).map(n => Tone.Frequency(n, 'midi').toNote());
+
+function startChord(g, rootIdx, isMinor) {
+  const notes = chordNotes(rootIdx, isMinor);
+  synth.triggerAttack(notes);
+  voicings.set(g, { rootIdx, isMinor, notes });
+  g.classList.add('on');
+  chordHub.textContent = triadLabel(rootIdx, isMinor, mod);
+}
+function stopChord(g) {
+  const v = voicings.get(g);
+  if (!v) return;
+  synth.triggerRelease(v.notes);
+  voicings.delete(g);
+  g.classList.remove('on');
+}
+// Alteration changed → re-voice every sounding chord, keeping common tones ringing
+// (only the notes that actually differ are released/attacked).
+function reVoiceAll() {
+  voicings.forEach((v, g) => {
+    const next = chordNotes(v.rootIdx, v.isMinor);
+    const drop = v.notes.filter(n => !next.includes(n));
+    const add = next.filter(n => !v.notes.includes(n));
+    if (drop.length) synth.triggerRelease(drop);
+    if (add.length) synth.triggerAttack(add);
+    v.notes = next;
+    chordHub.textContent = triadLabel(v.rootIdx, v.isMinor, mod);
+  });
+}
 
 ROOTS.forEach((_, rootIdx) => {
   [false, true].forEach(isMinor => {
@@ -52,20 +83,10 @@ ROOTS.forEach((_, rootIdx) => {
 
     const press = (e) => {
       g.releasePointerCapture?.(e.pointerId); // let the finger slide to a neighbour
-      const notes = triadMidi(rootIdx, octave, isMinor, mod).map(n => Tone.Frequency(n, 'midi').toNote());
-      if (latchEl.checked) {
-        if (latched.has(g)) { synth.triggerRelease(latched.get(g)); latched.delete(g); g.classList.remove('on'); return; }
-        synth.triggerAttack(notes); latched.set(g, notes); g.classList.add('on');
-      } else {
-        synth.triggerAttack(notes); g.dataset.notes = JSON.stringify(notes); g.classList.add('on');
-      }
-      chordHub.textContent = triadLabel(rootIdx, isMinor, mod);
+      if (latchEl.checked && voicings.has(g)) { stopChord(g); return; } // latch: second tap stops
+      if (!voicings.has(g)) startChord(g, rootIdx, isMinor);
     };
-    const release = () => {
-      if (latchEl.checked) return;
-      if (g.dataset.notes) { synth.triggerRelease(JSON.parse(g.dataset.notes)); g.dataset.notes = ''; }
-      g.classList.remove('on');
-    };
+    const release = () => { if (!latchEl.checked) stopChord(g); }; // latch holds until re-tapped
     g.addEventListener('pointerdown', press);
     g.addEventListener('pointerup', release);
     g.addEventListener('pointerleave', release);
@@ -78,17 +99,19 @@ chordWheel.appendChild(document.getElementById('chordHubGroup')); // hub on top
 
 // ============================ alteration wheel ============================
 // Two rings like the chord wheel: outer = sevenths/extensions (added over the
-// triad), inner = suspended/altered triads. Sticky single-select; centre clears.
+// triad), inner = suspended/altered triads. MOMENTARY: an alteration applies
+// only while held, and only colours chords that are already sounding.
 const altWheel = document.getElementById('altWheel');
 const altHub = document.getElementById('altHub');
 const ALT_OUTER = ['7', 'maj7', '6', '6/9', 'add9', 'add11', '9', 'maj9', '11', '13'];
 const ALT_INNER = ['sus2', 'sus4', '7sus4', '9sus4', 'aug', 'dim', 'dim7', 'm7b5', '7b5', '7#5', '7b9', '7#9'];
 const altSectors = new Map(); // name -> g
 
-function selectMod(name) {
+function setMod(name) {
   mod = name;
   altSectors.forEach((g, n) => g.classList.toggle('sel', n === name));
-  altHub.textContent = name === '—' ? '—' : name;
+  altHub.textContent = name;
+  reVoiceAll(); // recolour any held chords live
 }
 
 function buildAltRing(names, r0, r1, inner) {
@@ -96,8 +119,11 @@ function buildAltRing(names, r0, r1, inner) {
   names.forEach((name, i) => {
     const c = i * seg;
     const g = makeTile({ cls: 'tile alt' + (inner ? ' inner' : ''), r0, r1, a0: c - seg / 2, a1: c + seg / 2, label: name });
-    // select on release, skipped if the touch turned into a page swipe
-    g.addEventListener('pointerup', () => { if (!swiping) selectMod(name); });
+    g.addEventListener('pointerdown', () => setMod(name));
+    const clear = () => { if (mod === name) setMod('—'); }; // release → back to plain triad
+    g.addEventListener('pointerup', clear);
+    g.addEventListener('pointerleave', clear);
+    g.addEventListener('pointercancel', clear);
     altSectors.set(name, g);
     altWheel.appendChild(g);
   });
@@ -105,7 +131,6 @@ function buildAltRing(names, r0, r1, inner) {
 buildAltRing(ALT_OUTER, ...RING.maj, false);
 buildAltRing(ALT_INNER, ...RING.min, true);
 altWheel.appendChild(document.getElementById('altHubGroup'));
-document.getElementById('altHubGroup').addEventListener('pointerdown', () => selectMod('—'));
 
 // ============================ notes wheel (melodies) ============================
 // Page 2 of the right column. Single notes, two octaves: outer = octave+2,
@@ -182,8 +207,8 @@ document.getElementById('vol').addEventListener('input', e => { synth.volume.val
 
 latchEl.addEventListener('change', () => {
   if (!latchEl.checked) {
-    latched.forEach(n => synth.triggerRelease(n));
-    latched.clear();
+    voicings.forEach(v => synth.triggerRelease(v.notes));
+    voicings.clear();
     chordSectors.forEach(s => s.classList.remove('on'));
   }
 });
