@@ -1,11 +1,22 @@
-# Chord Pad
+# MusicPad
 
-A browser chord pad to accompany yourself while singing. Pick a root note (12
-chromatic notes), then hold a chord quality — major, minor, 5, sus2/4, dim,
-aug, 6, m6, 7, maj7, m7, m7b5, dim7, add9, 9, maj9, m9 — and it sustains while
-you sing.
+A browser chord/melody pad to accompany yourself while singing — designed for a
+**phone in landscape**. Two wheels: tap chords with one thumb, set alterations or
+play single-note melodies with the other.
 
 Built with [Vite](https://vite.dev/) + [Tone.js](https://tonejs.github.io/).
+Audio is a warm synth pad (no samples, no network).
+
+## Wheels
+
+- **Left — chords.** Outer ring = the 12 major chords, inner ring = the 12 minors,
+  chromatic with C at top. One tap = one finished chord. Centre shows what's playing.
+- **Right — two pages, swipe up/down:**
+  - **Alterations** (page 1): sticky modifier baked into every chord — 7, maj7, 9,
+    sus4, dim, m7b5, 7#9… Centre clears to a plain triad.
+  - **Melody** (page 2): single notes across two octaves for melodies (outer = octave+2,
+    inner = octave+1).
+- **⚙ Settings:** octave, attack, volume, latch (hold-to-sustain hands-free).
 
 ## Develop
 
@@ -14,26 +25,26 @@ npm install
 npm run dev      # dev server with hot reload
 npm run build    # production build to dist/
 npm run preview  # serve the built dist/
-npm test         # chord interval math
+npm test         # chord interval + wheel geometry math
 ```
 
-Audio uses the Tone.js Salamander piano sampler (loaded from CDN on first use,
-so the first chord needs network).
+## Deploy (Cloudflare Pages)
 
-- **Hold** a chord to play it; release to stop.
-- **Latch**: a tap leaves it sounding, another tap stops it — handy for hands-free.
-- **Octave** / **Volume** sliders adjust range and level.
+One-time auth, then deploy:
+
+```sh
+npx wrangler login      # opens a browser, authorise once
+npm run deploy          # builds and pushes dist/ to Cloudflare Pages
+```
+
+Lands at `https://musicpad.pages.dev`. Project name / output dir live in
+`wrangler.toml`.
 
 ## Layout
 
 - `index.html` — markup + Vite entry
 - `src/main.js` — UI wiring + audio
 - `src/chords.js` — chord theory (roots, qualities, MIDI math), shared with the test
+- `src/tile.js` — the single wheel-tile component (geometry + centred label)
 - `src/style.css`
 - `test.js`
-
-## Not done yet (add when needed)
-
-- Physical MIDI keyboard input (Web MIDI)
-- Recording / chord progressions
-- Offline sound (bundle samples instead of CDN)

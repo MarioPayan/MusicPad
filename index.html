@@ -2,22 +2,55 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Chord Pad</title>
 </head>
 <body>
-  <h1>CHORD PAD</h1>
-  <div class="now" id="now"><small>toca una nota para empezar</small></div>
-
-  <div class="grid roots" id="roots"></div>
-  <div class="grid quals" id="quals"></div>
-
-  <div class="controls">
-    <label>Octava <input type="range" id="oct" min="1" max="5" value="3"><span id="octv">3</span></label>
-    <label>Volumen <input type="range" id="vol" min="-40" max="0" value="-8"></label>
-    <label><input type="checkbox" id="latch"> Mantener (latch)</label>
+  <div class="wheelwrap">
+    <svg id="chordWheel" viewBox="0 0 100 100" aria-label="Rueda de acordes">
+      <g id="chordHubGroup">
+        <circle cx="50" cy="50" r="11.5" class="hub-bg"></circle>
+        <text id="chordHub" x="50" y="50" dy="0.34em">♪</text>
+      </g>
+    </svg>
   </div>
-  <div class="hint">Elegí una raíz arriba, luego mantené presionado un acorde para que suene mientras cantás. Con <b>latch</b>, un toque lo deja sonando y otro lo apaga.</div>
+
+  <div class="rcol" id="rcol">
+    <div class="rtrack" id="rtrack">
+      <div class="rpanel">
+        <svg id="altWheel" viewBox="0 0 100 100" aria-label="Rueda de alteraciones">
+          <g id="altHubGroup">
+            <circle cx="50" cy="50" r="11.5" class="hub-bg"></circle>
+            <text id="altHub" x="50" y="48" dy="0.34em">—</text>
+            <text class="hub-cap" x="50" y="56" dy="0.34em">alt</text>
+          </g>
+        </svg>
+      </div>
+      <div class="rpanel">
+        <svg id="notesWheel" viewBox="0 0 100 100" aria-label="Rueda de notas">
+          <g id="notesHubGroup">
+            <circle cx="50" cy="50" r="11.5" class="hub-bg"></circle>
+            <text id="notesHub" x="50" y="48" dy="0.34em">♪</text>
+            <text class="hub-cap" x="50" y="56" dy="0.34em">melodía</text>
+          </g>
+        </svg>
+      </div>
+    </div>
+    <div class="pagedots" id="pagedots"><span class="dot on"></span><span class="dot"></span></div>
+  </div>
+
+  <button class="gear" id="gear" aria-label="Configuración">⚙</button>
+
+  <div class="settings" id="settings" hidden>
+    <div class="panel">
+      <div class="panel-head"><b>Configuración</b><button class="gear" id="close" aria-label="Cerrar">✕</button></div>
+      <label>Octava <input type="range" id="oct" min="1" max="5" value="3"><span id="octv">3</span></label>
+      <label>Ataque <input type="range" id="atk" min="0.005" max="0.4" step="0.005" value="0.07"></label>
+      <label>Volumen <input type="range" id="vol" min="-40" max="0" value="-16"></label>
+      <label class="latch"><input type="checkbox" id="latch"> Mantener (latch)</label>
+      <p class="hint">Rueda izquierda = alteración (centro la limpia). Rueda derecha: anillo externo mayores, interno menores. La alteración elegida se hornea en cada acorde.</p>
+    </div>
+  </div>
 
   <script type="module" src="/src/main.js"></script>
 </body>
