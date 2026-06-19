@@ -4,30 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Chord Pad</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-<style>
-  :root { --bg:#16181d; --panel:#1f232b; --line:#2c313b; --txt:#e7e9ee; --accent:#5b8cff; --dim:#8a90a0; }
-  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  body { margin:0; font:16px/1.4 system-ui,sans-serif; background:var(--bg); color:var(--txt);
-         display:flex; flex-direction:column; min-height:100vh; align-items:center; padding:16px; gap:18px; }
-  h1 { font-size:18px; font-weight:600; margin:4px 0; color:var(--dim); letter-spacing:.5px; }
-  .now { font-size:42px; font-weight:700; min-height:50px; text-align:center; }
-  .now small { font-size:16px; color:var(--dim); font-weight:400; }
-  .grid { display:grid; gap:8px; width:100%; max-width:680px; }
-  .roots { grid-template-columns:repeat(6,1fr); }
-  .quals { grid-template-columns:repeat(4,1fr); }
-  button { font:inherit; color:var(--txt); background:var(--panel); border:1px solid var(--line);
-           border-radius:12px; padding:14px 0; cursor:pointer; user-select:none; touch-action:none;
-           transition:transform .04s, background .1s; }
-  button:active { transform:scale(.96); }
-  .roots button { font-size:20px; font-weight:600; }
-  .roots button.sel { background:var(--accent); border-color:var(--accent); color:#fff; }
-  .quals button.on { background:#2e7d5b; border-color:#3a9e73; }
-  .controls { display:flex; gap:18px; align-items:center; color:var(--dim); font-size:14px; flex-wrap:wrap; justify-content:center; }
-  .controls label { display:flex; gap:8px; align-items:center; }
-  input[type=range] { width:120px; }
-  .hint { color:var(--dim); font-size:13px; text-align:center; max-width:680px; }
-</style>
 </head>
 <body>
   <h1>CHORD PAD</h1>
@@ -43,105 +19,6 @@
   </div>
   <div class="hint">Elegí una raíz arriba, luego mantené presionado un acorde para que suene mientras cantás. Con <b>latch</b>, un toque lo deja sonando y otro lo apaga.</div>
 
-<script>
-const ROOTS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-// chord quality -> semitone intervals from the root
-const QUALITIES = {
-  'maj':[0,4,7], 'min':[0,3,7], '5':[0,7], 'sus2':[0,2,7], 'sus4':[0,5,7],
-  'dim':[0,3,6], 'aug':[0,4,8], '6':[0,4,7,9], 'm6':[0,3,7,9],
-  '7':[0,4,7,10], 'maj7':[0,4,7,11], 'm7':[0,3,7,10], 'm7b5':[0,3,6,10], 'dim7':[0,3,6,9],
-  'add9':[0,4,7,14], '9':[0,4,7,10,14], 'maj9':[0,4,7,11,14], 'm9':[0,3,7,10,14],
-};
-
-// Salamander piano sampler — sounds nicer to sing over than raw oscillators.
-// Loads samples from the Tone.js CDN; needs network on first use.
-let started = false;
-const sampler = new Tone.Sampler({
-  urls: { A1:'A1.mp3', A2:'A2.mp3', A3:'A3.mp3', A4:'A4.mp3', C2:'C2.mp3', C3:'C3.mp3', C4:'C4.mp3', C5:'C5.mp3' },
-  baseUrl: 'https://tonejs.github.io/audio/salamander/',
-  release: 1,
-}).toDestination();
-
-let selectedRoot = 0;        // index into ROOTS
-let octave = 3;
-const latched = new Map();   // qualityName -> notes[] currently held in latch mode
-
-function notesFor(qual) {
-  const base = 12 * (octave + 1) + selectedRoot;   // midi number of root
-  return QUALITIES[qual].map(i => Tone.Frequency(base + i, 'midi').toNote());
-}
-function label(qual) {
-  return ROOTS[selectedRoot] + (qual === 'maj' ? '' : qual);
-}
-
-async function ensureStarted() {
-  if (started) return;
-  await Tone.start();
-  started = true;
-}
-
-// --- build root buttons ---
-const rootsEl = document.getElementById('roots');
-ROOTS.forEach((r, i) => {
-  const b = document.createElement('button');
-  b.textContent = r;
-  if (i === selectedRoot) b.classList.add('sel');
-  b.addEventListener('pointerdown', async () => {
-    await ensureStarted();
-    selectedRoot = i;
-    [...rootsEl.children].forEach(c => c.classList.remove('sel'));
-    b.classList.add('sel');
-  });
-  rootsEl.appendChild(b);
-});
-
-// --- build quality buttons ---
-const qualsEl = document.getElementById('quals');
-const nowEl = document.getElementById('now');
-const latchEl = document.getElementById('latch');
-
-Object.keys(QUALITIES).forEach(qual => {
-  const b = document.createElement('button');
-  b.textContent = qual === 'maj' ? 'maj' : qual;
-
-  const press = async () => {
-    await ensureStarted();
-    if (latchEl.checked) {
-      if (latched.has(qual)) { sampler.triggerRelease(latched.get(qual)); latched.delete(qual); b.classList.remove('on'); return; }
-      const n = notesFor(qual); sampler.triggerAttack(n); latched.set(qual, n); b.classList.add('on');
-      nowEl.innerHTML = label(qual);
-    } else {
-      const n = notesFor(qual); sampler.triggerAttack(n); b.dataset.notes = JSON.stringify(n);
-      b.classList.add('on'); nowEl.innerHTML = label(qual);
-    }
-  };
-  const release = () => {
-    if (latchEl.checked) return;            // latch mode releases on next press
-    if (b.dataset.notes) { sampler.triggerRelease(JSON.parse(b.dataset.notes)); b.dataset.notes = ''; }
-    b.classList.remove('on');
-  };
-
-  b.addEventListener('pointerdown', press);
-  b.addEventListener('pointerup', release);
-  b.addEventListener('pointerleave', release);
-  b.addEventListener('pointercancel', release);
-  qualsEl.appendChild(b);
-});
-
-// --- controls ---
-const octEl = document.getElementById('oct'), octvEl = document.getElementById('octv');
-octEl.addEventListener('input', () => { octave = +octEl.value; octvEl.textContent = octave; });
-document.getElementById('vol').addEventListener('input', e => { sampler.volume.value = +e.target.value; });
-sampler.volume.value = -8;
-
-// turning latch off kills anything still held
-latchEl.addEventListener('change', () => {
-  if (!latchEl.checked) {
-    latched.forEach(n => sampler.triggerRelease(n));
-    latched.clear();
-    [...qualsEl.children].forEach(c => c.classList.remove('on'));
-  }
-});
-</script>
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>
